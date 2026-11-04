@@ -1,6 +1,8 @@
 // Lead queries. All SQL uses tagged templates, so values are always sent as parameters.
 
+import { LeadAnalysisSchema } from "@/lib/ai/schemas";
 import { sql } from "@/lib/db";
+import { startOfDayIST } from "@/lib/dates";
 import { normalizeEmail, normalizePhone } from "@/lib/duplicates";
 import type { Lead, LeadAnalysis, LeadInput, LeadSource, LeadStatus, Tier } from "@/types";
 
@@ -10,6 +12,13 @@ export type LeadFilters = { tier?: Tier; status?: LeadStatus; q?: string };
 function iso(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   return value instanceof Date ? value.toISOString() : String(value);
+}
+
+// Stored analysis that no longer matches the schema is treated as "not analyzed" instead of crashing pages.
+function parseAnalysis(value: unknown): LeadAnalysis | null {
+  if (value === null || value === undefined) return null;
+  const result = LeadAnalysisSchema.safeParse(value);
+  return result.success ? result.data : null;
 }
 
 export function rowToLead(row: Record<string, unknown>): Lead {
@@ -26,7 +35,7 @@ export function rowToLead(row: Record<string, unknown>): Lead {
     message: row.message as string,
     source: row.source as LeadSource,
     status: row.status as LeadStatus,
-    analysis: (row.analysis as LeadAnalysis | null) ?? null,
+    analysis: parseAnalysis(row.analysis),
     score: (row.score as number | null) ?? null,
     tier: (row.tier as Tier | null) ?? null,
     next_follow_up_at: iso(row.next_follow_up_at),
@@ -52,11 +61,20 @@ export async function getLead(id: string): Promise<Lead | null> {
   return rows[0] ? rowToLead(rows[0]) : null;
 }
 
+const LIST_LIMIT = 200;
+
+// Make user search text safe for ilike: % and _ would otherwise act as wildcards.
+function escapeLike(text: string): string {
+  return text.replace(/[\\%_]/g, "\\$&");
+}
+
 // Sort order (ARCHITECTURE.md section 6): overdue follow-ups, then tier, then score, then newest.
+// "Overdue" means the follow-up falls on an earlier IST calendar day than today.
 export async function listLeads(filters: LeadFilters = {}): Promise<Lead[]> {
   const tier = filters.tier ?? null;
   const status = filters.status ?? null;
-  const q = filters.q?.trim() || null;
+  const q = filters.q?.trim() ? escapeLike(filters.q.trim()) : null;
+  const startOfToday = startOfDayIST().toISOString();
   const rows = await sql`
     select * from leads
     where (${tier}::text is null or tier = ${tier})
@@ -64,13 +82,18 @@ export async function listLeads(filters: LeadFilters = {}): Promise<Lead[]> {
       and (${q}::text is null
            or name ilike '%' || ${q} || '%'
            or location ilike '%' || ${q} || '%'
+           or property_req ilike '%' || ${q} || '%'
            or phone ilike '%' || ${q} || '%'
            or email ilike '%' || ${q} || '%')
     order by
-      (next_follow_up_at is not null and next_follow_up_at < now() and status not in ('won', 'lost')) desc,
+      (next_follow_up_at is not null
+        and next_follow_up_at < ${startOfToday}::timestamptz
+        and status not in ('won', 'lost')) desc,
       case tier when 'hot' then 0 when 'warm' then 1 when 'cold' then 2 else 3 end,
       score desc nulls last,
-      created_at desc`;
+      created_at desc,
+      id
+    limit ${LIST_LIMIT}`;
   return rows.map(rowToLead);
 }
 

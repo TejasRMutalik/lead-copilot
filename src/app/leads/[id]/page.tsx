@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { AnalysisPanel } from "@/components/analysis-panel";
 import { RunAnalysisButton } from "@/components/run-analysis-button";
+import { StatusSelect } from "@/components/status-select";
 import { Timeline } from "@/components/timeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +16,8 @@ import { isUuid } from "@/lib/validation";
 
 // Reads the lead from the database, so it sits inside Suspense on the page below.
 async function LeadDetail({ params }: { params: Promise<{ id: string }> }) {
+  // The timeline shows times relative to today, so wait for a real request first.
+  await connection();
   const { id } = await params;
   if (!isUuid(id)) notFound();
   const lead = await getLead(id);
@@ -28,7 +32,10 @@ async function LeadDetail({ params }: { params: Promise<{ id: string }> }) {
             <AnalysisPanel lead={lead} analysis={lead.analysis} />
           ) : (
             <div className="space-y-4">
-              <h1 className="text-2xl font-semibold">{lead.name}</h1>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-2xl font-semibold">{lead.name}</h1>
+                <StatusSelect leadId={lead.id} status={lead.status} />
+              </div>
               <p className="text-muted-foreground">
                 This lead was saved, but it has not been analyzed yet.
               </p>

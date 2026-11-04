@@ -1,6 +1,7 @@
 // The "scan in 5 seconds" view of a lead: tier, summary and next action first, details below.
 
 import { CopyButton } from "@/components/copy-button";
+import { StatusSelect } from "@/components/status-select";
 import { TierBadge } from "@/components/tier-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,9 +49,7 @@ export function AnalysisPanel({ lead, analysis }: { lead: Lead; analysis: LeadAn
         <h1 className="text-2xl font-semibold">{lead.name}</h1>
         <TierBadge tier={lead.tier} />
         <span className="text-lg font-medium">{lead.score ?? "-"}/100</span>
-        <Badge variant="outline" className="capitalize">
-          {lead.status}
-        </Badge>
+        <StatusSelect leadId={lead.id} status={lead.status} />
       </div>
 
       <p className="text-lg leading-relaxed">{analysis.summary}</p>

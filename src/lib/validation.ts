@@ -39,6 +39,19 @@ export const CreateLeadSchema = LeadInputSchema.extend({
   skipDuplicateCheck: z.boolean().optional(), // used in Phase 7
 });
 
+export const TierSchema = z.enum(["hot", "warm", "cold"]);
+export const StatusSchema = z.enum(["new", "contacted", "negotiating", "won", "lost"]);
+
+// Query string of GET /api/leads. Empty values are treated as "no filter".
+export const ListQuerySchema = z.object({
+  tier: TierSchema.optional(),
+  status: StatusSchema.optional(),
+  q: z.string().trim().max(100).optional(),
+});
+
+// Body of PATCH /api/leads/[id].
+export const StatusUpdateSchema = z.object({ status: StatusSchema });
+
 export function isUuid(value: string): boolean {
   return z.uuid().safeParse(value).success;
 }

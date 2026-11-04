@@ -25,12 +25,15 @@ export function addDaysIST(days: number, now: Date = new Date()): Date {
   return new Date(startOfDayIST(now).getTime() + days * DAY_MS);
 }
 
+// Whole IST calendar days from today to `date`: 0 = today, 1 = tomorrow, -2 = two days ago.
+export function dayDiffIST(date: Date | string, now: Date = new Date()): number {
+  const target = typeof date === "string" ? new Date(date) : date;
+  return Math.round((startOfDayIST(target).getTime() - startOfDayIST(now).getTime()) / DAY_MS);
+}
+
 // Human text like "today", "tomorrow", "3 days ago", "in 2 days", compared by IST calendar day.
 export function formatRelativeIST(date: Date | string, now: Date = new Date()): string {
-  const target = typeof date === "string" ? new Date(date) : date;
-  const diffDays = Math.round(
-    (startOfDayIST(target).getTime() - startOfDayIST(now).getTime()) / DAY_MS,
-  );
+  const diffDays = dayDiffIST(date, now);
   if (diffDays === 0) return "today";
   if (diffDays === 1) return "tomorrow";
   if (diffDays === -1) return "yesterday";
