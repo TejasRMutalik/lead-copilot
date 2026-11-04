@@ -5,7 +5,8 @@ export type LeadStatus = "new" | "contacted" | "negotiating" | "won" | "lost";
 export type LeadSource = "form" | "paste" | "seed";
 export type Intent = "buy_to_live" | "investment" | "rent" | "just_browsing" | "unclear";
 
-export type Signal = { score: 0 | 1 | 2 | 3; reason: string };
+// score is 0..3; Zod enforces the range and scoring.ts clamps it again.
+export type Signal = { score: number; reason: string };
 
 export type LeadAnalysis = {
   summary: string;
