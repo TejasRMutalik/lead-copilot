@@ -39,3 +39,13 @@ export async function listEvents(leadId: string): Promise<LeadEvent[]> {
 export async function updateEventPayload(id: string, payload: unknown, score: number | null): Promise<void> {
   await sql`update lead_events set payload = ${JSON.stringify(payload ?? null)}::jsonb, score = ${score} where id = ${id}`;
 }
+
+// The most recent debrief event for each of the given leads (used to brief the AI on the last call).
+export async function listLatestDebriefs(leadIds: string[]): Promise<Map<string, LeadEvent>> {
+  if (leadIds.length === 0) return new Map();
+  const rows = await sql`
+    select distinct on (lead_id) * from lead_events
+    where type = 'debrief' and lead_id = any(${leadIds}::uuid[])
+    order by lead_id, created_at desc`;
+  return new Map(rows.map((row) => [row.lead_id as string, rowToEvent(row)]));
+}

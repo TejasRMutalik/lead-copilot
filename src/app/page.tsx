@@ -1,10 +1,11 @@
-// Home page: header, a spot for the Today panel (Phase 9), filters, and the ranked lead list.
+// Home page: header, the Today panel, filters, and the ranked lead list.
 
 import { connection } from "next/server";
 import Link from "next/link";
 import { Suspense } from "react";
 import { LeadFilters } from "@/components/lead-filters";
 import { LeadList } from "@/components/lead-list";
+import { TodayPanel } from "@/components/today-panel";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listLeads } from "@/lib/repo/leads";
@@ -35,7 +36,7 @@ export default function Home({ searchParams }: { searchParams: SearchParams }) {
         </Link>
       </header>
       <main className="mx-auto w-full max-w-4xl space-y-6 p-4 sm:p-6">
-        {/* Today panel goes here in Phase 9. */}
+        <TodayPanel />
         <Suspense fallback={<Skeleton className="h-8 w-full" />}>
           <LeadFilters />
         </Suspense>

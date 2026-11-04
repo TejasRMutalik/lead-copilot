@@ -5,6 +5,7 @@ import { StatusSelect } from "@/components/status-select";
 import { TierBadge } from "@/components/tier-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { whatsappUrl } from "@/lib/whatsapp";
 import type { Lead, LeadAnalysis } from "@/types";
 
 const SIGNAL_LABELS: { key: keyof LeadAnalysis["signals"]; label: string }[] = [
@@ -33,15 +34,8 @@ function SignalBar({ value }: { value: number }) {
   );
 }
 
-// WhatsApp wants country code + number. Assume India for 10-digit numbers.
-function whatsappLink(lead: Lead, text: string): string | null {
-  if (!lead.phone_norm) return null;
-  const number = lead.phone_norm.length === 10 ? `91${lead.phone_norm}` : lead.phone_norm;
-  return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
-}
-
 export function AnalysisPanel({ lead, analysis }: { lead: Lead; analysis: LeadAnalysis }) {
-  const whatsapp = whatsappLink(lead, analysis.suggested_response);
+  const whatsapp = whatsappUrl(lead.phone_norm, analysis.suggested_response);
 
   return (
     <div className="space-y-4">

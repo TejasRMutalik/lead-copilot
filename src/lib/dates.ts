@@ -54,3 +54,11 @@ export function weekdayIST(now: Date = new Date()): string {
 export function followUpAtIST(days: number, now: Date = new Date()): Date {
   return new Date(addDaysIST(days, now).getTime() + 10 * 60 * 60 * 1000);
 }
+
+// "Good morning", "Good afternoon" or "Good evening", by the hour in IST.
+export function greetingIST(now: Date = new Date()): string {
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "numeric", hourCycle: "h23" }).format(now));
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}

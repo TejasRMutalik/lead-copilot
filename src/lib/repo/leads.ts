@@ -2,9 +2,10 @@
 
 import { LeadAnalysisSchema } from "@/lib/ai/schemas";
 import { sql } from "@/lib/db";
-import { startOfDayIST } from "@/lib/dates";
+import { addDaysIST, startOfDayIST } from "@/lib/dates";
+import { classifyDue, compareDue } from "@/lib/due";
 import { normalizeEmail, normalizePhone } from "@/lib/duplicates";
-import type { Lead, LeadAnalysis, LeadInput, LeadSource, LeadStatus, Tier } from "@/types";
+import type { DueLead, Lead, LeadAnalysis, LeadInput, LeadSource, LeadStatus, Tier } from "@/types";
 
 export type LeadFilters = { tier?: Tier; status?: LeadStatus; q?: string };
 
@@ -200,4 +201,23 @@ export async function applyDebrief(id: string, f: DebriefFields): Promise<Lead |
     where id = ${id}
     returning *`;
   return rows[0] ? rowToLead(rows[0]) : null;
+}
+
+// Leads that need attention today, most urgent first (rules are in lib/due.ts).
+export async function listDueLeads(now: Date = new Date()): Promise<DueLead[]> {
+  const startOfTomorrow = addDaysIST(1, now).toISOString();
+  // Candidates only: open leads with a follow-up up to today, or hot/warm leads with no follow-up set.
+  const rows = await sql`
+    select * from leads
+    where status not in ('won', 'lost')
+      and (next_follow_up_at < ${startOfTomorrow}::timestamptz
+           or (next_follow_up_at is null and tier in ('hot', 'warm')))
+    limit 500`;
+  const due: DueLead[] = [];
+  for (const row of rows) {
+    const lead = rowToLead(row);
+    const found = classifyDue(lead, now);
+    if (found) due.push({ lead, ...found });
+  }
+  return due.sort(compareDue);
 }

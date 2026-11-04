@@ -101,3 +101,29 @@ export type DebriefSummary = {
   follow_up_message: string | null;
   note: string | null; // extra explanation, e.g. engagement lowered after 3 missed calls
 };
+
+// Why a lead shows up in the morning briefing.
+export type DueReason = "overdue" | "due_today" | "going_cold" | "new_hot";
+
+export type DueLead = { lead: Lead; reason: DueReason; days: number };
+
+// One card in the Today panel: the AI text plus the lead facts the card needs.
+export type BriefingItem = {
+  lead_id: string;
+  why_now: string;
+  opening_line: string;
+  draft_message: string;
+  name: string;
+  tier: Tier | null;
+  score: number | null;
+  phone_norm: string | null;
+  reason: DueReason;
+  days: number;
+};
+
+export type BriefingResponse = {
+  headline: string;
+  items: BriefingItem[];
+  total_due: number; // can be more than items.length, because the plan is capped
+  ai_failed: boolean; // true when the list is shown without AI text
+};

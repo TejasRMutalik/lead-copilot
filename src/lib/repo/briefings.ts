@@ -22,7 +22,7 @@ export async function getBriefing(dateIST: string, hash: string): Promise<Briefi
   return rows[0] ? rowToBriefing(rows[0]) : null;
 }
 
-// If the same (date, hash) is saved twice, the first one wins.
+// Saving the same (date, hash) again replaces the plan, which is how "Refresh plan" works.
 export async function saveBriefing(
   dateIST: string,
   hash: string,
@@ -31,7 +31,7 @@ export async function saveBriefing(
   const rows = await sql`
     insert into briefings (date_ist, leads_hash, content)
     values (${dateIST}::date, ${hash}, ${JSON.stringify(content)}::jsonb)
-    on conflict (date_ist, leads_hash) do update set leads_hash = excluded.leads_hash
+    on conflict (date_ist, leads_hash) do update set content = excluded.content, created_at = now()
     returning id, date_ist::text as date_ist, leads_hash, content, created_at`;
   return rowToBriefing(rows[0]);
 }

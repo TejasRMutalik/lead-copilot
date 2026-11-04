@@ -47,7 +47,7 @@ async function LeadDetail({ params }: { params: Promise<{ id: string }> }) {
           )}
         </div>
         <div className="space-y-6">
-          <Card className="h-fit">
+          <Card id="debrief" className="h-fit">
             <CardHeader>
               <CardTitle>How did the call go?</CardTitle>
             </CardHeader>
