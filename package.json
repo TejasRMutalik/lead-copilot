@@ -14,6 +14,7 @@
     "ai:try": "tsx --env-file=.env.local scripts/try-analyze.ts",
     "dup:check": "tsx scripts/check-duplicates.ts",
     "seed:gen": "tsx --env-file=.env.local scripts/gen-seed-analyses.ts",
+    "samples:check": "tsx --env-file=.env.local scripts/check-samples.ts",
     "db:seed": "tsx --env-file=.env.local db/seed.ts"
   },
   "dependencies": {
