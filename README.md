@@ -5,7 +5,7 @@ An AI workspace for a real-estate salesperson. It reads each inbound enquiry, sc
 - **Live demo:** https://lead-copilot-swart.vercel.app (no sign-in, shared demo workspace)
 - **Built for:** the Masal AI FDE assignment, Round 2
 
-![Dashboard with the Today panel and ranked lead list](docs/screenshot.png)
+
 
 ## What I built
 
