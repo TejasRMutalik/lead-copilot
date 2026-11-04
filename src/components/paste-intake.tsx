@@ -1,10 +1,10 @@
 "use client";
 
-// The Paste tab: paste a messy dump, review the extracted draft leads, then save them one at a time
+// The Paste tab: paste a messy dump (or upload a WhatsApp export), review the extracted draft leads, then save them one at a time
 // (each save also runs the AI analysis, so progress is shown lead by lead).
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { readChatFile } from "@/lib/chat-file";
 import { SAMPLE_DUMP } from "@/lib/sample-dump";
 import { LeadInputSchema } from "@/lib/validation";
 
@@ -63,6 +64,7 @@ export function PasteIntake() {
   const [saving, setSaving] = useState(false);
   const [progressNote, setProgressNote] = useState("");
   const [finished, setFinished] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   // Warn before leaving the page while the save queue is running.
   useEffect(() => {
@@ -72,14 +74,33 @@ export function PasteIntake() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [saving]);
 
-  async function extract() {
+  // Reads an uploaded WhatsApp export, puts its text in the box and extracts the leads straight away.
+  async function onFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // lets the same file be chosen again
+    if (!file) return;
+    try {
+      const { text: chatText, trimmed } = await readChatFile(file);
+      if (chatText.length < 20) {
+        toast.error("That file has no chat text in it.");
+        return;
+      }
+      setText(chatText);
+      if (trimmed) toast.warning("Long chat: using the newest messages only.");
+      await extract(chatText);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not read that file.");
+    }
+  }
+
+  async function extract(source: string = text) {
     setParsing(true);
     setFinished(false);
     try {
       const res = await fetch("/api/intake/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text: source }),
       });
       const json = await res.json();
       if (!json.ok) {
@@ -177,9 +198,19 @@ export function PasteIntake() {
         />
         <p className="text-xs text-muted-foreground">{text.length}/15000</p>
         <div className="flex gap-2">
-          <Button onClick={extract} disabled={parsing || saving || text.trim().length < 20}>
+          <Button onClick={() => extract()} disabled={parsing || saving || text.trim().length < 20}>
             {parsing ? "Extracting leads..." : "Extract leads"}
           </Button>
+          <Button variant="outline" disabled={parsing || saving} onClick={() => fileInput.current?.click()}>
+            Upload WhatsApp export
+          </Button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".zip,.txt"
+            className="hidden"
+            onChange={onFileChosen}
+          />
           <Button variant="outline" disabled={parsing || saving} onClick={() => setText(SAMPLE_DUMP)}>
             Load sample dump
           </Button>
