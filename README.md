@@ -3,7 +3,6 @@
 An AI workspace for a real-estate salesperson. It reads each inbound enquiry, scores it, tells you what to do next and drafts the reply. Then it keeps every lead up to date from your call notes, and plans your day.
 
 - **Live demo:** https://lead-copilot-swart.vercel.app (no sign-in, shared demo workspace)
-- **Demo video (3 min):** _add link here_
 - **Built for:** the Masal AI FDE assignment, Round 2
 
 ![Dashboard with the Today panel and ranked lead list](docs/screenshot.png)
