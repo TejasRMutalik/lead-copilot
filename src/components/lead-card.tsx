@@ -1,27 +1,12 @@
 // One compact row in the lead list. The whole card links to the lead page.
 
 import Link from "next/link";
+import { FollowUpChip } from "@/components/follow-up-chip";
 import { TierBadge } from "@/components/tier-badge";
 import { Badge } from "@/components/ui/badge";
-import { dayDiffIST } from "@/lib/dates";
 import type { Lead } from "@/types";
 
-// Follow-up chip text and color, compared by IST calendar day.
-function followUpChip(lead: Lead): { text: string; className: string } | null {
-  if (!lead.next_follow_up_at || lead.status === "won" || lead.status === "lost") return null;
-  const days = dayDiffIST(lead.next_follow_up_at);
-  if (days < 0) {
-    return { text: `Overdue ${-days}d`, className: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200" };
-  }
-  if (days === 0) {
-    return { text: "Due today", className: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200" };
-  }
-  return { text: `In ${days}d`, className: "bg-muted text-muted-foreground" };
-}
-
 export function LeadCard({ lead }: { lead: Lead }) {
-  const chip = followUpChip(lead);
-
   return (
     <Link
       href={`/leads/${lead.id}`}
@@ -32,7 +17,7 @@ export function LeadCard({ lead }: { lead: Lead }) {
         {lead.score !== null && <span className="text-sm font-medium">{lead.score}</span>}
         <span className="font-medium">{lead.name}</span>
         <span className="text-sm text-muted-foreground">{lead.location}</span>
-        {chip && <Badge className={chip.className}>{chip.text}</Badge>}
+        <FollowUpChip lead={lead} />
         <Badge variant="outline" className="ml-auto capitalize">
           {lead.status}
         </Badge>

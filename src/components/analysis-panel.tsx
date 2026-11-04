@@ -1,8 +1,7 @@
-// The "scan in 5 seconds" view of a lead: tier, summary and next action first, details below.
+// What to do with this lead, in the order a salesperson needs it: next action, reply to send, then the reasoning.
 
+import { ChevronRight } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
-import { StatusSelect } from "@/components/status-select";
-import { TierBadge } from "@/components/tier-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { whatsappUrl } from "@/lib/whatsapp";
@@ -23,7 +22,7 @@ const INTENT_LABELS: Record<LeadAnalysis["intent"], string> = {
   unclear: "Unclear",
 };
 
-// Four segments, filled up to the signal value (0 to 3).
+// Three segments, filled up to the signal value (0 to 3).
 function SignalBar({ value }: { value: number }) {
   return (
     <div className="flex gap-1" aria-label={`${value} out of 3`}>
@@ -34,24 +33,55 @@ function SignalBar({ value }: { value: number }) {
   );
 }
 
+// A section that starts closed and opens on click. Plain <details>, so it works without JavaScript.
+function Collapsible({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <details className="group rounded-lg border bg-card">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="size-4 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden />
+        {title}
+        {hint && <span className="font-normal text-muted-foreground">{hint}</span>}
+      </summary>
+      <div className="border-t px-4 py-3">{children}</div>
+    </details>
+  );
+}
+
 export function AnalysisPanel({ lead, analysis }: { lead: Lead; analysis: LeadAnalysis }) {
   const whatsapp = whatsappUrl(lead.phone_norm, analysis.suggested_response);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">{lead.name}</h1>
-        <TierBadge tier={lead.tier} />
-        <span className="text-lg font-medium">{lead.score ?? "-"}/100</span>
-        <StatusSelect leadId={lead.id} status={lead.status} />
+    <div className="space-y-5">
+      <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Next action</p>
+        <p className="mt-1 text-lg font-semibold leading-snug">{analysis.next_action}</p>
       </div>
 
-      <p className="text-lg leading-relaxed">{analysis.summary}</p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Suggested reply ({analysis.language})</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm leading-relaxed">
+            {analysis.suggested_response}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <CopyButton text={analysis.suggested_response} />
+            {whatsapp && (
+              <a
+                href={whatsapp}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-7 items-center rounded-lg border px-2.5 text-[0.8rem] font-medium hover:bg-muted"
+              >
+                Open in WhatsApp
+              </a>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-      <div className="rounded-lg border-l-4 border-primary bg-muted p-4">
-        <p className="text-xs font-medium uppercase text-muted-foreground">Next action</p>
-        <p className="font-medium">{analysis.next_action}</p>
-      </div>
+      <p className="text-base leading-relaxed text-muted-foreground">{analysis.summary}</p>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
@@ -87,52 +117,6 @@ export function AnalysisPanel({ lead, analysis }: { lead: Lead; analysis: LeadAn
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Intent: {INTENT_LABELS[analysis.intent]}</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">{analysis.intent_note}</CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Why this score</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {SIGNAL_LABELS.map(({ key, label }) => (
-            <div key={key}>
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-sm font-medium">{label}</span>
-                <SignalBar value={analysis.signals[key].score} />
-              </div>
-              <p className="text-sm text-muted-foreground">{analysis.signals[key].reason}</p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Suggested response ({analysis.language})</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">{analysis.suggested_response}</p>
-          <div className="flex gap-2">
-            <CopyButton text={analysis.suggested_response} />
-            {whatsapp && (
-              <a
-                href={whatsapp}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-7 items-center rounded-lg border px-2.5 text-[0.8rem] font-medium hover:bg-muted"
-              >
-                Open in WhatsApp
-              </a>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
       {analysis.red_flags.length > 0 && (
         <Card className="border-red-300 dark:border-red-900">
           <CardHeader>
@@ -147,6 +131,28 @@ export function AnalysisPanel({ lead, analysis }: { lead: Lead; analysis: LeadAn
           </CardContent>
         </Card>
       )}
+
+      <div className="space-y-2">
+        <Collapsible title="Why this score" hint={`${lead.score ?? "-"}/100`}>
+          <div className="space-y-3">
+            {SIGNAL_LABELS.map(({ key, label }) => (
+              <div key={key}>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-sm font-medium">{label}</span>
+                  <SignalBar value={analysis.signals[key].score} />
+                </div>
+                <p className="text-sm text-muted-foreground">{analysis.signals[key].reason}</p>
+              </div>
+            ))}
+          </div>
+        </Collapsible>
+        <Collapsible title="Intent" hint={INTENT_LABELS[analysis.intent]}>
+          <p className="text-sm text-muted-foreground">{analysis.intent_note}</p>
+        </Collapsible>
+        <Collapsible title="Customer's message">
+          <p className="whitespace-pre-wrap text-sm text-muted-foreground">{lead.message}</p>
+        </Collapsible>
+      </div>
     </div>
   );
 }

@@ -1,17 +1,15 @@
-// Lead detail page: analysis on the left, call debrief and chat on the right, timeline at the bottom.
+// Lead detail page: summary bar on top, what to do on the left, call debrief and chat on the right, timeline at the bottom.
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { AnalysisPanel } from "@/components/analysis-panel";
+import { LeadSummaryBar } from "@/components/lead-summary-bar";
+import { LeadWorkspace } from "@/components/lead-workspace";
 import { RunAnalysisButton } from "@/components/run-analysis-button";
-import { StatusSelect } from "@/components/status-select";
 import { Timeline } from "@/components/timeline";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DebriefForm } from "@/components/debrief-form";
-import { LeadChat } from "@/components/lead-chat";
 import { listMessages } from "@/lib/repo/chat";
 import { listEvents } from "@/lib/repo/events";
 import { getLead } from "@/lib/repo/leads";
@@ -29,41 +27,19 @@ async function LeadDetail({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <>
+      <LeadSummaryBar lead={lead} />
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           {lead.analysis ? (
             <AnalysisPanel lead={lead} analysis={lead.analysis} />
           ) : (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl font-semibold">{lead.name}</h1>
-                <StatusSelect leadId={lead.id} status={lead.status} />
-              </div>
-              <p className="text-muted-foreground">
-                This lead was saved, but it has not been analyzed yet.
-              </p>
+              <p className="text-muted-foreground">This lead was saved, but it has not been analyzed yet.</p>
               <RunAnalysisButton leadId={lead.id} />
             </div>
           )}
         </div>
-        <div className="space-y-6">
-          <Card id="debrief" className="h-fit">
-            <CardHeader>
-              <CardTitle>How did the call go?</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <DebriefForm leadId={lead.id} />
-            </CardContent>
-          </Card>
-          <Card className="h-fit">
-            <CardHeader>
-              <CardTitle>Chat</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <LeadChat leadId={lead.id} initialMessages={messages} analyzed={lead.analysis !== null} />
-            </CardContent>
-          </Card>
-        </div>
+        <LeadWorkspace leadId={lead.id} messages={messages} analyzed={lead.analysis !== null} />
       </div>
       <section className="space-y-2">
         <h2 className="text-lg font-semibold">Timeline</h2>

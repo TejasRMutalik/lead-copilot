@@ -3,6 +3,7 @@
 // The Today panel at the top of the home page: who to contact first, why, what to say, and a ready message.
 // It loads on the client so the lead list below is never held up by the AI.
 
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { CopyButton } from "@/components/copy-button";
@@ -102,19 +103,19 @@ export function TodayPanel() {
   }
 
   return (
-    <section className="space-y-3 rounded-lg border bg-card p-4">
+    <section className="space-y-2 rounded-lg border bg-card px-3 py-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-semibold">Today</h2>
-          <p className="text-sm text-muted-foreground">{greeting || " "}</p>
+        <div className="flex flex-wrap items-baseline gap-x-3">
+          <h2 className="text-base font-semibold">Today</h2>
+          <p className="text-xs text-muted-foreground">{greeting || " "}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           {!collapsed && (
-            <Button variant="outline" size="sm" disabled={loading || coolingDown} onClick={refresh}>
-              Refresh plan
+            <Button variant="ghost" size="sm" disabled={loading || coolingDown} onClick={refresh}>
+              Refresh
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={toggle}>
+          <Button variant="ghost" size="sm" onClick={toggle}>
             {collapsed ? "Show" : "Hide"}
           </Button>
         </div>
@@ -122,7 +123,7 @@ export function TodayPanel() {
 
       {!collapsed && (
         <>
-          {loading && !data && <Skeleton className="h-24 w-full" />}
+          {loading && !data && <Skeleton className="h-10 w-full" />}
           {error && (
             <p className="text-sm text-destructive">
               {error}{" "}
@@ -138,74 +139,89 @@ export function TodayPanel() {
   );
 }
 
+const VISIBLE_ROWS = 3; // the rest are behind "Show all"
+
 function Plan({ data, loading, onRetry }: { data: BriefingResponse; loading: boolean; onRetry: () => void }) {
+  const [showAll, setShowAll] = useState(false);
+  const rows = showAll ? data.items : data.items.slice(0, VISIBLE_ROWS);
+  const hidden = data.items.length - rows.length;
+
   return (
-    <div className={`space-y-3 ${loading ? "opacity-60" : ""}`}>
-      <p className="font-medium">{data.headline}</p>
+    <div className={`space-y-1 ${loading ? "opacity-60" : ""}`}>
+      <p className="text-sm font-medium">{data.headline}</p>
       {data.ai_failed && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           AI plan unavailable, showing the due list only.{" "}
           <Button variant="outline" size="sm" onClick={onRetry}>
             Retry
           </Button>
         </p>
       )}
-      <ol className="space-y-3">
-        {data.items.map((item, index) => (
-          <BriefingCard key={item.lead_id} item={item} number={index + 1} />
+      <ol className="divide-y">
+        {rows.map((item, index) => (
+          <BriefingRow key={item.lead_id} item={item} number={index + 1} />
         ))}
       </ol>
-      {data.total_due > data.items.length && (
-        <p className="text-sm text-muted-foreground">
-          +{data.total_due - data.items.length} more due. The lead list below shows overdue leads first.
-        </p>
-      )}
+      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        {hidden > 0 && (
+          <button type="button" className="underline hover:text-foreground" onClick={() => setShowAll(true)}>
+            Show all {data.items.length}
+          </button>
+        )}
+        {showAll && data.items.length > VISIBLE_ROWS && (
+          <button type="button" className="underline hover:text-foreground" onClick={() => setShowAll(false)}>
+            Show less
+          </button>
+        )}
+        {data.total_due > data.items.length && (
+          <span>+{data.total_due - data.items.length} more due (the lead list below shows overdue first)</span>
+        )}
+      </div>
     </div>
   );
 }
 
-function BriefingCard({ item, number }: { item: BriefingItem; number: number }) {
+const LINK_BUTTON =
+  "inline-flex h-7 items-center rounded-lg border px-2.5 text-[0.8rem] font-medium hover:bg-muted";
+
+// One line per lead. Click it to see what to say and the action buttons.
+function BriefingRow({ item, number }: { item: BriefingItem; number: number }) {
   const whatsapp = item.draft_message ? whatsappUrl(item.phone_norm, item.draft_message) : null;
 
   return (
-    <li className="space-y-2 rounded-lg border p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold text-muted-foreground">{number}.</span>
-        <span className="font-medium">{item.name}</span>
-        <TierBadge tier={item.tier} />
-        <Badge className={CHIP_STYLES[item.reason]}>{dueChipText(item.reason, item.days)}</Badge>
-      </div>
-      <p className="text-sm">{item.why_now}</p>
-      {item.opening_line && (
-        <p className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">Open with:</span> {item.opening_line}
-        </p>
-      )}
-      <div className="flex flex-wrap gap-2">
-        {item.draft_message && <CopyButton text={item.draft_message} />}
-        {whatsapp && (
-          <a
-            href={whatsapp}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex h-7 items-center rounded-lg border px-2.5 text-[0.8rem] font-medium hover:bg-muted"
-          >
-            WhatsApp
-          </a>
-        )}
-        <Link
-          href={`/leads/${item.lead_id}`}
-          className="inline-flex h-7 items-center rounded-lg border px-2.5 text-[0.8rem] font-medium hover:bg-muted"
-        >
-          Open lead
-        </Link>
-        <Link
-          href={`/leads/${item.lead_id}#debrief`}
-          className="inline-flex h-7 items-center rounded-lg border px-2.5 text-[0.8rem] font-medium hover:bg-muted"
-        >
-          Mark done
-        </Link>
-      </div>
+    <li>
+      <details className="group py-1.5">
+        <summary className="flex cursor-pointer list-none items-center gap-2 text-sm [&::-webkit-details-marker]:hidden">
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden />
+          <span className="text-muted-foreground">{number}.</span>
+          <span className="shrink-0 font-medium">{item.name}</span>
+          <TierBadge tier={item.tier} />
+          <Badge className={CHIP_STYLES[item.reason]}>{dueChipText(item.reason, item.days)}</Badge>
+          <span className="hidden min-w-0 flex-1 truncate text-muted-foreground md:inline">{item.why_now}</span>
+        </summary>
+        <div className="space-y-2 pb-1 pl-6 pt-1.5">
+          <p className="text-sm md:hidden">{item.why_now}</p>
+          {item.opening_line && (
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Open with:</span> {item.opening_line}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {item.draft_message && <CopyButton text={item.draft_message} />}
+            {whatsapp && (
+              <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={LINK_BUTTON}>
+                WhatsApp
+              </a>
+            )}
+            <Link href={`/leads/${item.lead_id}`} className={LINK_BUTTON}>
+              Open lead
+            </Link>
+            <Link href={`/leads/${item.lead_id}#debrief`} className={LINK_BUTTON}>
+              Mark done
+            </Link>
+          </div>
+        </div>
+      </details>
     </li>
   );
 }
