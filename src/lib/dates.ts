@@ -1,0 +1,38 @@
+// Date helpers for business logic. "Today" always means today in Asia/Kolkata (IST, UTC+5:30, no DST).
+
+const TZ = "Asia/Kolkata";
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Today's date in IST as "YYYY-MM-DD".
+export function todayIST(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+// The instant when the IST day containing `now` began (00:00 IST).
+export function startOfDayIST(now: Date = new Date()): Date {
+  const midnightAsUtc = Date.parse(`${todayIST(now)}T00:00:00Z`);
+  return new Date(midnightAsUtc - IST_OFFSET_MS);
+}
+
+// Start of the IST day that is `days` days after the IST day containing `now`.
+export function addDaysIST(days: number, now: Date = new Date()): Date {
+  return new Date(startOfDayIST(now).getTime() + days * DAY_MS);
+}
+
+// Human text like "today", "tomorrow", "3 days ago", "in 2 days", compared by IST calendar day.
+export function formatRelativeIST(date: Date | string, now: Date = new Date()): string {
+  const target = typeof date === "string" ? new Date(date) : date;
+  const diffDays = Math.round(
+    (startOfDayIST(target).getTime() - startOfDayIST(now).getTime()) / DAY_MS,
+  );
+  if (diffDays === 0) return "today";
+  if (diffDays === 1) return "tomorrow";
+  if (diffDays === -1) return "yesterday";
+  return diffDays > 0 ? `in ${diffDays} days` : `${-diffDays} days ago`;
+}
