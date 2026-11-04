@@ -3,7 +3,7 @@
 // The new-lead form. Checks the fields in the browser first, then saves the lead and opens its page.
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,28 +27,96 @@ const EMPTY = {
 
 type Fields = typeof EMPTY;
 
-const SAMPLE: Fields = {
-  name: "Priya Nair",
-  phone: "+91 98450 12345",
-  email: "priya.nair@example.com",
-  location: "Whitefield, Bengaluru",
-  property_req: "3 BHK apartment, ready to move, near ITPL",
-  budget_text: "1.2 Cr - 1.4 Cr",
-  timeline_text: "Within 2 months",
-  message:
-    "Hi, we are shifting from Chennai for work and need a 3 BHK in Whitefield. Home loan is pre-approved. Can we see 2-3 options this weekend? Parking and a good school nearby are important.",
-};
+// Different made-up leads for the "Fill sample" button. Phones and emails are fake and match no demo lead.
+const SAMPLES: Fields[] = [
+  {
+    name: "Neha Gupta",
+    phone: "+91 99000 11001",
+    email: "neha.gupta@example.com",
+    location: "Whitefield, Bengaluru",
+    property_req: "3 BHK apartment, ready to move, near ITPL",
+    budget_text: "1.2 Cr - 1.4 Cr",
+    timeline_text: "Within 2 months",
+    message:
+      "Hi, we are shifting from Chennai for work and need a 3 BHK in Whitefield. Home loan is pre-approved. Can we see 2-3 options this weekend? Parking and a good school nearby are important.",
+  },
+  {
+    name: "Karthik Subramanian",
+    phone: "+91 99000 11002",
+    email: "karthik.s@example.com",
+    location: "Sarjapur Road, Bengaluru",
+    property_req: "2 BHK apartment in a gated community",
+    budget_text: "80 - 90 lakh",
+    timeline_text: "3 to 4 months",
+    message:
+      "Hello, I work from home and want a 2 BHK on Sarjapur Road with a quiet balcony and good internet. I have 30 lakh saved and will take a loan for the rest. What are my options?",
+  },
+  {
+    name: "Farhan Ali",
+    phone: "+91 99000 11003",
+    email: "",
+    location: "Electronic City, Bengaluru",
+    property_req: "2 BHK flat, quick possession",
+    budget_text: "55 - 60 lakh",
+    timeline_text: "Next month",
+    message:
+      "Bhai, Electronic City mein 2BHK chahiye, budget 55-60 lakh. Possession jaldi chahiye, next month tak. Loan ho jayega. Kab call kar sakte ho?",
+  },
+  {
+    name: "Divya Menon",
+    phone: "+91 99000 11004",
+    email: "divya.menon@example.com",
+    location: "Hebbal, Bengaluru",
+    property_req: "3 BHK near the Outer Ring Road",
+    budget_text: "1.0 - 1.15 Cr",
+    timeline_text: "Around 6 months",
+    message:
+      "Hi, we are looking at Hebbal for a 3 BHK. Not in a hurry, but we want to understand prices and which projects have good schools around. Can you send details?",
+  },
+  {
+    name: "Suresh Patil",
+    phone: "+91 99000 11005",
+    email: "suresh.patil@example.com",
+    location: "Yelahanka, Bengaluru",
+    property_req: "30x40 residential plot, BDA approved",
+    budget_text: "85 - 95 lakh",
+    timeline_text: "Within 3 months",
+    message:
+      "I want to buy a 30x40 plot in Yelahanka to build my own house. BDA approved only, clear title. Budget up to 95 lakh, ready to pay a token this month if the papers are clean.",
+  },
+  {
+    name: "Aisha Rahman",
+    phone: "+91 99000 11006",
+    email: "aisha.rahman@example.com",
+    location: "HSR Layout, Bengaluru",
+    property_req: "1 BHK flat for rent, furnished",
+    budget_text: "25 - 28k per month",
+    timeline_text: "Move in by 1 December",
+    message:
+      "Looking for a furnished 1 BHK on rent in HSR Layout, budget 28k per month. I am a software engineer, no pets. Need to move by 1 December. Please share what is available.",
+  },
+];
 
 export function LeadForm() {
   const router = useRouter();
   const [fields, setFields] = useState<Fields>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<keyof Fields, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const lastSample = useRef(-1); // so the same sample is not shown twice in a row
   const [duplicates, setDuplicates] = useState<{ input: LeadInput; candidates: DuplicateCandidate[] } | null>(null);
   const [resolving, setResolving] = useState(false);
 
   function setField(name: keyof Fields, value: string) {
     setFields((current) => ({ ...current, [name]: value }));
+  }
+
+  // Fills the form with a random sample lead, different from the previous one.
+  function fillSample() {
+    let next = Math.floor(Math.random() * SAMPLES.length);
+    if (next === lastSample.current) next = (next + 1) % SAMPLES.length;
+    lastSample.current = next;
+    setFields(SAMPLES[next]);
+    setErrors({});
   }
 
   async function submit(event: React.FormEvent) {
@@ -137,7 +205,7 @@ export function LeadForm() {
         <Button type="submit" disabled={submitting}>
           {submitting ? "Analyzing lead..." : "Save and analyze"}
         </Button>
-        <Button type="button" variant="outline" disabled={submitting} onClick={() => setFields(SAMPLE)}>
+        <Button type="button" variant="outline" disabled={submitting} onClick={fillSample}>
           Fill sample
         </Button>
       </div>
