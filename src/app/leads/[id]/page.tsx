@@ -1,4 +1,4 @@
-// Lead detail page: analysis on the left, a placeholder for chat and debrief on the right, timeline at the bottom.
+// Lead detail page: analysis on the left, chat on the right, timeline at the bottom.
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,6 +10,8 @@ import { StatusSelect } from "@/components/status-select";
 import { Timeline } from "@/components/timeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LeadChat } from "@/components/lead-chat";
+import { listMessages } from "@/lib/repo/chat";
 import { listEvents } from "@/lib/repo/events";
 import { getLead } from "@/lib/repo/leads";
 import { isUuid } from "@/lib/validation";
@@ -22,7 +24,7 @@ async function LeadDetail({ params }: { params: Promise<{ id: string }> }) {
   if (!isUuid(id)) notFound();
   const lead = await getLead(id);
   if (!lead) notFound();
-  const events = await listEvents(id);
+  const [events, messages] = await Promise.all([listEvents(id), listMessages(id, 50)]);
 
   return (
     <>
@@ -45,9 +47,11 @@ async function LeadDetail({ params }: { params: Promise<{ id: string }> }) {
         </div>
         <Card className="h-fit">
           <CardHeader>
-            <CardTitle>Chat and call debrief</CardTitle>
+            <CardTitle>Chat</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">Coming in a later phase.</CardContent>
+          <CardContent>
+            <LeadChat leadId={lead.id} initialMessages={messages} analyzed={lead.analysis !== null} />
+          </CardContent>
         </Card>
       </div>
       <section className="space-y-2">

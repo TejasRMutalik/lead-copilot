@@ -52,6 +52,9 @@ export const ListQuerySchema = z.object({
 // Body of PATCH /api/leads/[id].
 export const StatusUpdateSchema = z.object({ status: StatusSchema });
 
+// Body of POST /api/leads/[id]/chat.
+export const ChatBodySchema = z.object({ message: z.string().trim().min(1).max(1000) });
+
 export function isUuid(value: string): boolean {
   return z.uuid().safeParse(value).success;
 }
