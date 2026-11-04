@@ -1,15 +1,10 @@
 // Lead queries. All SQL uses tagged templates, so values are always sent as parameters.
 
 import { sql } from "@/lib/db";
+import { normalizeEmail, normalizePhone } from "@/lib/duplicates";
 import type { Lead, LeadAnalysis, LeadInput, LeadSource, LeadStatus, Tier } from "@/types";
 
 export type LeadFilters = { tier?: Tier; status?: LeadStatus; q?: string };
-
-// Digits only, keeping the last 10 (drops +91 / leading 0 for Indian numbers).
-export function normalizePhone(phone: string | null | undefined): string | null {
-  const digits = (phone ?? "").replace(/\D/g, "");
-  return digits.length > 0 ? digits.slice(-10) : null;
-}
 
 // Timestamps come back from Neon as Date objects; the app uses ISO strings.
 function iso(value: unknown): string | null {
@@ -43,11 +38,10 @@ export function rowToLead(row: Record<string, unknown>): Lead {
 }
 
 export async function createLead(input: LeadInput, source: LeadSource): Promise<Lead> {
-  const email = input.email?.trim().toLowerCase() || null;
   const phone = input.phone?.trim() || null;
   const rows = await sql`
     insert into leads (name, phone, phone_norm, email, location, property_req, budget_text, timeline_text, message, source)
-    values (${input.name}, ${phone}, ${normalizePhone(phone)}, ${email}, ${input.location},
+    values (${input.name}, ${phone}, ${normalizePhone(phone)}, ${normalizeEmail(input.email)}, ${input.location},
             ${input.property_req}, ${input.budget_text}, ${input.timeline_text}, ${input.message}, ${source})
     returning *`;
   return rowToLead(rows[0]);
@@ -122,7 +116,7 @@ export async function findByPhoneOrEmail(
   phoneNorm: string | null,
   email: string | null,
 ): Promise<Lead[]> {
-  const cleanEmail = email?.trim().toLowerCase() || null;
+  const cleanEmail = normalizeEmail(email);
   if (!phoneNorm && !cleanEmail) return [];
   const rows = await sql`
     select * from leads

@@ -20,8 +20,10 @@ export type ChatTurn = { role: "user" | "assistant"; content: string };
 
 type Provider = { kind: "gemini" | "groq"; model: string };
 
-const TIMEOUT_MS = 25_000;
+const TIMEOUT_MS = 25_000; // per attempt
 const WAIT_BEFORE_FALLBACK_MS = 2_000;
+// Whole call budget. Vercel routes stop at 60 s, so we give up a little before that.
+const TOTAL_BUDGET_MS = 55_000;
 
 // Gemini model, Gemini fallback model, then Groq if configured.
 function getProviders(): Provider[] {
@@ -45,10 +47,12 @@ type CallRequest = {
   jsonSchema?: Record<string, unknown>; // set when we want JSON back
 };
 
-// One model call with a 25 second timeout. Returns the raw text.
-async function callProvider(provider: Provider, req: CallRequest): Promise<string> {
+// One model call. It times out after 25 seconds, or sooner if the overall deadline is close.
+async function callProvider(provider: Provider, req: CallRequest, deadline: number): Promise<string> {
+  const timeoutMs = Math.min(TIMEOUT_MS, deadline - Date.now());
+  if (timeoutMs < 1_000) throw new Error("out of time");
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     if (provider.kind === "gemini") {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -117,17 +121,18 @@ function isRateLimit(err: unknown): boolean {
 // Runs `attempt` against each provider in order until one works.
 async function runChain<T>(
   label: string,
-  attempt: (provider: Provider) => Promise<T>,
+  attempt: (provider: Provider, deadline: number) => Promise<T>,
 ): Promise<{ result: T; model: string }> {
   const providers = getProviders();
   if (providers.length === 0) throw new AiError("AI_UNAVAILABLE", "No AI provider is configured.");
 
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
   let sawRateLimit = false;
   for (let i = 0; i < providers.length; i++) {
     const provider = providers[i];
     const started = Date.now();
     try {
-      const result = await attempt(provider);
+      const result = await attempt(provider, deadline);
       console.log(`[ai] ${label} ok model=${provider.model} ms=${Date.now() - started} provider_try=${i + 1}`);
       return { result, model: provider.model };
     } catch (err) {
@@ -137,7 +142,10 @@ async function runChain<T>(
       console.warn(
         `[ai] ${label} failed model=${provider.model} ms=${Date.now() - started} status=${(err as { status?: number })?.status ?? "none"}`,
       );
-      if (i < providers.length - 1) await wait(WAIT_BEFORE_FALLBACK_MS);
+      if (i < providers.length - 1) {
+        if (deadline - Date.now() < WAIT_BEFORE_FALLBACK_MS + 1_000) break; // no time left for another model
+        await wait(WAIT_BEFORE_FALLBACK_MS);
+      }
     }
   }
   throw finalError(sawRateLimit);
@@ -155,7 +163,7 @@ export async function generateJson<T>(args: GenerateJsonArgs<T>): Promise<{ data
   const temperature = args.temperature ?? 0.3;
 
   // Ask once; if the answer fails validation, ask again with the error included.
-  const askAndValidate = async (provider: Provider): Promise<T> => {
+  const askAndValidate = async (provider: Provider, deadline: number): Promise<T> => {
     const base: CallRequest = {
       system: args.system,
       turns: [{ role: "user", content: args.user }],
@@ -177,7 +185,7 @@ export async function generateJson<T>(args: GenerateJsonArgs<T>): Promise<{ data
                 },
               ],
             };
-      const text = await callProvider(provider, req);
+      const text = await callProvider(provider, req, deadline);
       try {
         return args.schema.parse(JSON.parse(stripFences(text)));
       } catch (err) {
@@ -197,12 +205,12 @@ export async function generateText(args: {
   messages: ChatTurn[];
   temperature?: number;
 }): Promise<{ text: string; model: string }> {
-  const { result, model } = await runChain("text", async (provider) => {
-    const text = await callProvider(provider, {
-      system: args.system,
-      turns: args.messages,
-      temperature: args.temperature ?? 0.5,
-    });
+  const { result, model } = await runChain("text", async (provider, deadline) => {
+    const text = await callProvider(
+      provider,
+      { system: args.system, turns: args.messages, temperature: args.temperature ?? 0.5 },
+      deadline,
+    );
     if (!text.trim()) throw new Error("empty reply");
     return text.trim();
   });
