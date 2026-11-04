@@ -44,3 +44,13 @@ export function formatRelativeIST(date: Date | string, now: Date = new Date()): 
 export function formatDayIST(date: Date | string): string {
   return new Intl.DateTimeFormat("en-IN", { timeZone: TZ, day: "numeric", month: "short" }).format(new Date(date));
 }
+
+// Weekday name in IST, like "Saturday". Passed to prompts so the model can work out "this Saturday".
+export function weekdayIST(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "long" }).format(now);
+}
+
+// Follow-up time: 10:00 IST, `days` IST calendar days from today.
+export function followUpAtIST(days: number, now: Date = new Date()): Date {
+  return new Date(addDaysIST(days, now).getTime() + 10 * 60 * 60 * 1000);
+}

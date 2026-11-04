@@ -68,3 +68,13 @@ export function describeIssues(error: z.ZodError): string {
 export const MergeLeadSchema = LeadInputSchema.extend({
   source: z.enum(["form", "paste"]).default("form"),
 });
+
+// Body of POST /api/leads/[id]/debrief. A plain "no answer" needs no notes (and no AI call).
+export const DebriefBodySchema = z
+  .object({
+    notes: z.string().trim().max(4000, "Max 4000 characters").optional(),
+    outcome: z.literal("no_answer").optional(),
+  })
+  .refine((body) => body.outcome === "no_answer" || (body.notes ?? "").length >= 10, {
+    message: "notes: Write at least 10 characters about the call",
+  });

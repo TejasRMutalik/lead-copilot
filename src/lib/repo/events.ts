@@ -34,3 +34,8 @@ export async function listEvents(leadId: string): Promise<LeadEvent[]> {
     select * from lead_events where lead_id = ${leadId} order by created_at desc`;
   return rows.map(rowToEvent);
 }
+
+// Replaces the payload (and score) of an event. Used to fill in a debrief that was saved before the AI ran.
+export async function updateEventPayload(id: string, payload: unknown, score: number | null): Promise<void> {
+  await sql`update lead_events set payload = ${JSON.stringify(payload ?? null)}::jsonb, score = ${score} where id = ${id}`;
+}

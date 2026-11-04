@@ -88,3 +88,16 @@ export type DuplicateCandidate = {
   confidence: number;
   reason: string;
 };
+
+// What the debrief card shows after a call. Scores are before and after the debrief.
+export type DebriefSummary = {
+  call_outcome: "interested" | "needs_time" | "site_visit_booked" | "not_interested" | "no_answer";
+  old_score: number | null;
+  new_score: number | null;
+  new_tier: Tier | null;
+  new_objections: string[];
+  follow_up_at: string | null;
+  follow_up_reason: string | null;
+  follow_up_message: string | null;
+  note: string | null; // extra explanation, e.g. engagement lowered after 3 missed calls
+};

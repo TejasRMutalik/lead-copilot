@@ -1,4 +1,4 @@
-// Lead detail page: analysis on the left, chat on the right, timeline at the bottom.
+// Lead detail page: analysis on the left, call debrief and chat on the right, timeline at the bottom.
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,6 +10,7 @@ import { StatusSelect } from "@/components/status-select";
 import { Timeline } from "@/components/timeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DebriefForm } from "@/components/debrief-form";
 import { LeadChat } from "@/components/lead-chat";
 import { listMessages } from "@/lib/repo/chat";
 import { listEvents } from "@/lib/repo/events";
@@ -45,14 +46,24 @@ async function LeadDetail({ params }: { params: Promise<{ id: string }> }) {
             </div>
           )}
         </div>
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle>Chat</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <LeadChat leadId={lead.id} initialMessages={messages} analyzed={lead.analysis !== null} />
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle>How did the call go?</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DebriefForm leadId={lead.id} />
+            </CardContent>
+          </Card>
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle>Chat</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <LeadChat leadId={lead.id} initialMessages={messages} analyzed={lead.analysis !== null} />
+            </CardContent>
+          </Card>
+        </div>
       </div>
       <section className="space-y-2">
         <h2 className="text-lg font-semibold">Timeline</h2>

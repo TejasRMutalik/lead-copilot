@@ -176,3 +176,28 @@ export async function mergeIntoLead(id: string, fields: MergeFields): Promise<Le
     returning *`;
   return rows[0] ? rowToLead(rows[0]) : null;
 }
+
+export type DebriefFields = {
+  analysis: LeadAnalysis | null;
+  score: number | null;
+  tier: Tier | null;
+  status: LeadStatus;
+  markContacted: boolean; // false for "no answer": we did not actually reach them
+  followUpAt: Date | null;
+  followUpReason: string | null;
+};
+
+// Writes everything a call debrief changes on the lead in one update.
+export async function applyDebrief(id: string, f: DebriefFields): Promise<Lead | null> {
+  const rows = await sql`
+    update leads
+    set analysis = ${f.analysis ? JSON.stringify(f.analysis) : null}::jsonb, score = ${f.score}, tier = ${f.tier},
+        status = ${f.status},
+        last_contacted_at = case when ${f.markContacted} then now() else last_contacted_at end,
+        next_follow_up_at = ${f.followUpAt ? f.followUpAt.toISOString() : null}::timestamptz,
+        follow_up_reason = ${f.followUpReason},
+        updated_at = now()
+    where id = ${id}
+    returning *`;
+  return rows[0] ? rowToLead(rows[0]) : null;
+}
