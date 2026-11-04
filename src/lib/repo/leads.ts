@@ -153,3 +153,26 @@ export async function findRecentForFuzzy(limit: number): Promise<Lead[]> {
   const rows = await sql`select * from leads order by created_at desc limit ${limit}`;
   return rows.map(rowToLead);
 }
+
+export type MergeFields = {
+  phone: string | null;
+  email: string | null;
+  property_req: string;
+  budget_text: string;
+  timeline_text: string;
+  message: string;
+  status: LeadStatus;
+};
+
+// Writes the result of merging a repeat enquiry into an existing lead.
+export async function mergeIntoLead(id: string, fields: MergeFields): Promise<Lead | null> {
+  const rows = await sql`
+    update leads
+    set phone = ${fields.phone}, phone_norm = ${normalizePhone(fields.phone)}, email = ${normalizeEmail(fields.email)},
+        property_req = ${fields.property_req}, budget_text = ${fields.budget_text},
+        timeline_text = ${fields.timeline_text}, message = ${fields.message},
+        status = ${fields.status}, updated_at = now()
+    where id = ${id}
+    returning *`;
+  return rows[0] ? rowToLead(rows[0]) : null;
+}

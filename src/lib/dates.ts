@@ -39,3 +39,8 @@ export function formatRelativeIST(date: Date | string, now: Date = new Date()): 
   if (diffDays === -1) return "yesterday";
   return diffDays > 0 ? `in ${diffDays} days` : `${-diffDays} days ago`;
 }
+
+// Short day label in IST, like "4 Nov".
+export function formatDayIST(date: Date | string): string {
+  return new Intl.DateTimeFormat("en-IN", { timeZone: TZ, day: "numeric", month: "short" }).format(new Date(date));
+}

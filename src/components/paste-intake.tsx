@@ -12,7 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { DuplicateDialog } from "@/components/duplicate-dialog";
 import { readChatFile } from "@/lib/chat-file";
+import { mergeLead, postLead } from "@/lib/lead-client";
+import type { DuplicateCandidate, LeadInput } from "@/types";
 import { SAMPLE_DUMP } from "@/lib/sample-dump";
 import { LeadInputSchema } from "@/lib/validation";
 
@@ -26,7 +29,16 @@ type FieldName =
   | "timeline_text"
   | "message";
 
-type SaveStatus = "pending" | "saving" | "saved" | "unanalyzed" | "failed";
+type SaveStatus = "pending" | "saving" | "saved" | "merged" | "skipped" | "unanalyzed" | "failed";
+
+// What the user chose in the duplicate dialog.
+type DuplicateChoice = { action: "merge"; leadId: string } | { action: "new" } | { action: "cancel" };
+
+type DuplicatePrompt = {
+  draft: Draft;
+  candidates: DuplicateCandidate[];
+  resolve: (choice: DuplicateChoice) => void;
+};
 
 type Draft = Record<FieldName, string> & {
   key: number;
@@ -50,6 +62,11 @@ const RATE_LIMIT_WAIT_MS = 5000;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Only the lead fields, without the table bookkeeping (key, include, status).
+function toInput(draft: Draft): LeadInput {
+  return Object.fromEntries(COLUMNS.map((c) => [c.name, draft[c.name]])) as LeadInput;
+}
+
 // Which fields of a draft fail the same rules the lead form uses (empty required fields, bad email).
 function invalidFields(draft: Draft): Set<string> {
   const result = LeadInputSchema.safeParse(draft);
@@ -65,6 +82,7 @@ export function PasteIntake() {
   const [progressNote, setProgressNote] = useState("");
   const [finished, setFinished] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [duplicatePrompt, setDuplicatePrompt] = useState<DuplicatePrompt | null>(null);
 
   // Warn before leaving the page while the save queue is running.
   useEffect(() => {
@@ -139,26 +157,50 @@ export function PasteIntake() {
   const toSave = (drafts ?? []).filter((d) => d.include && (d.status === "pending" || d.status === "failed"));
   const canSave = toSave.length > 0 && toSave.every((d) => invalidFields(d).size === 0);
 
-  // Saves one lead. The POST route saves first and analyzes second, so a rate limit
-  // leaves a saved, unanalyzed lead that we can analyze again after a pause.
-  async function saveOne(draft: Draft): Promise<SaveStatus> {
-    const res = await fetch("/api/leads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...draft, source: "paste" }),
-    });
-    const json = await res.json();
-    if (!json.ok) return "failed";
-    update(draft.key, { leadId: json.data.id });
-    if (!json.warning) return "saved";
+  // Pauses the queue until the user answers the duplicate dialog for this draft.
+  function askAboutDuplicate(draft: Draft, candidates: DuplicateCandidate[]) {
+    return new Promise<DuplicateChoice>((resolve) => setDuplicatePrompt({ draft, candidates, resolve }));
+  }
 
-    if (json.warning === "AI_RATE_LIMIT") {
-      setProgressNote(`Rate limit reached, waiting 5 seconds before retrying ${draft.name}...`);
+  function answerDuplicate(choice: DuplicateChoice) {
+    duplicatePrompt?.resolve(choice);
+    setDuplicatePrompt(null);
+  }
+
+  // The save and merge routes save first and analyze second, so a rate limit leaves a saved,
+  // unanalyzed lead that we can analyze again after a pause.
+  async function settle(leadId: string, name: string, warning: string | undefined, done: SaveStatus) {
+    if (!warning) return done;
+    if (warning === "AI_RATE_LIMIT") {
+      setProgressNote(`Rate limit reached, waiting 5 seconds before retrying ${name}...`);
       await wait(RATE_LIMIT_WAIT_MS);
-      const retry = await fetch(`/api/leads/${json.data.id}/analyze`, { method: "POST" });
-      if ((await retry.json()).ok) return "saved";
+      const retry = await fetch(`/api/leads/${leadId}/analyze`, { method: "POST" });
+      if ((await retry.json()).ok) return done;
     }
     return "unanalyzed";
+  }
+
+  async function saveOne(draft: Draft): Promise<SaveStatus> {
+    const input = toInput(draft);
+    let outcome = await postLead(input, "paste");
+    let done: SaveStatus = "saved";
+
+    if (outcome.kind === "duplicates") {
+      setProgressNote(`${draft.name} looks like an existing lead. Waiting for your choice...`);
+      const choice = await askAboutDuplicate(draft, outcome.candidates);
+      if (choice.action === "cancel") return "skipped";
+      setProgressNote(`Saving... analyzing ${draft.name}`);
+      if (choice.action === "merge") {
+        outcome = await mergeLead(choice.leadId, input, "paste");
+        done = "merged";
+      } else {
+        outcome = await postLead(input, "paste", true);
+      }
+    }
+
+    if (outcome.kind !== "saved") return "failed";
+    update(draft.key, { leadId: outcome.lead.id });
+    return settle(outcome.lead.id, draft.name, outcome.warning, done);
   }
 
   async function saveAll() {
@@ -245,7 +287,7 @@ export function PasteIntake() {
               <TableBody>
                 {drafts.map((draft) => {
                   const invalid = invalidFields(draft);
-                  const locked = saving || draft.status === "saved" || draft.status === "unanalyzed";
+                  const locked = saving || !["pending", "failed"].includes(draft.status);
                   return (
                     <TableRow key={draft.key}>
                       <TableCell>
@@ -297,6 +339,8 @@ export function PasteIntake() {
           {finished && (
             <div className="rounded-md border p-3 text-sm">
               {count("saved")} saved
+              {count("merged") > 0 && `, ${count("merged")} merged`}
+              {count("skipped") > 0 && `, ${count("skipped")} skipped`}
               {count("unanalyzed") > 0 && `, ${count("unanalyzed")} saved but need analysis`}
               {count("failed") > 0 && `, ${count("failed")} failed (fix and save again)`}.{" "}
               <Link href="/" className="underline">
@@ -308,6 +352,17 @@ export function PasteIntake() {
           <Button onClick={saveAll} disabled={!canSave || saving}>
             {saving ? "Saving..." : `Save ${toSave.length} lead${toSave.length === 1 ? "" : "s"}`}
           </Button>
+
+          {duplicatePrompt && (
+            <DuplicateDialog
+              incoming={toInput(duplicatePrompt.draft)}
+              candidates={duplicatePrompt.candidates}
+              busy={false}
+              onMerge={(leadId) => answerDuplicate({ action: "merge", leadId })}
+              onSaveNew={() => answerDuplicate({ action: "new" })}
+              onCancel={() => answerDuplicate({ action: "cancel" })}
+            />
+          )}
         </div>
       )}
     </div>
@@ -317,10 +372,12 @@ export function PasteIntake() {
 function StatusCell({ draft }: { draft: Draft }) {
   if (draft.status === "saving") return <span>Saving...</span>;
   if (draft.status === "failed") return <span className="text-destructive">Failed</span>;
-  if (draft.status === "saved" || draft.status === "unanalyzed") {
+  if (draft.status === "skipped") return <span className="text-muted-foreground">Skipped</span>;
+  if (draft.status === "saved" || draft.status === "merged" || draft.status === "unanalyzed") {
+    const label = { saved: "Saved", merged: "Merged", unanalyzed: "Saved, not analyzed" }[draft.status];
     return (
       <Link href={`/leads/${draft.leadId}`} className="underline">
-        {draft.status === "saved" ? "Saved" : "Saved, not analyzed"}
+        {label}
       </Link>
     );
   }

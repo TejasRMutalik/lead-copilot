@@ -9,7 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DuplicateDialog } from "@/components/duplicate-dialog";
+import { mergeLead, postLead, type SaveResult } from "@/lib/lead-client";
 import { LeadInputSchema, MESSAGE_MAX } from "@/lib/validation";
+import type { DuplicateCandidate, LeadInput } from "@/types";
 
 const EMPTY = {
   name: "",
@@ -41,6 +44,8 @@ export function LeadForm() {
   const [fields, setFields] = useState<Fields>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<keyof Fields, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [duplicates, setDuplicates] = useState<{ input: LeadInput; candidates: DuplicateCandidate[] } | null>(null);
+  const [resolving, setResolving] = useState(false);
 
   function setField(name: keyof Fields, value: string) {
     setFields((current) => ({ ...current, [name]: value }));
@@ -64,24 +69,30 @@ export function LeadForm() {
     setErrors({});
 
     setSubmitting(true);
-    try {
-      const res = await fetch("/api/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fields),
-      });
-      const json = await res.json();
-      if (!json.ok) {
-        toast.error(json.error?.message ?? "Could not save the lead.");
-        setSubmitting(false);
-        return;
-      }
-      if (json.warning) toast.warning("Lead saved, but the AI analysis failed. You can run it again.");
-      router.push(`/leads/${json.data.id}`);
-    } catch {
-      toast.error("Could not reach the server. Please try again.");
+    handleResult(await postLead(result.data, "form"), result.data);
+  }
+
+  // Saved: open the lead. Possible duplicate: nothing is saved yet, so ask the user. Error: show it.
+  function handleResult(outcome: SaveResult, input: LeadInput) {
+    if (outcome.kind === "duplicates") {
+      setDuplicates({ input, candidates: outcome.candidates });
       setSubmitting(false);
+      return;
     }
+    if (outcome.kind === "error") {
+      toast.error(outcome.message);
+      setSubmitting(false);
+      return;
+    }
+    if (outcome.warning) toast.warning("Lead saved, but the AI analysis failed. You can run it again.");
+    router.push(`/leads/${outcome.lead.id}`);
+  }
+
+  async function resolve(action: () => Promise<SaveResult>, input: LeadInput) {
+    setResolving(true);
+    handleResult(await action(), input);
+    setResolving(false);
+    setDuplicates(null);
   }
 
   // One label + input + inline error. `long` makes a textarea.
@@ -130,6 +141,16 @@ export function LeadForm() {
           Fill sample
         </Button>
       </div>
+      {duplicates && (
+        <DuplicateDialog
+          incoming={duplicates.input}
+          candidates={duplicates.candidates}
+          busy={resolving}
+          onMerge={(leadId) => resolve(() => mergeLead(leadId, duplicates.input, "form"), duplicates.input)}
+          onSaveNew={() => resolve(() => postLead(duplicates.input, "form", true), duplicates.input)}
+          onCancel={() => setDuplicates(null)}
+        />
+      )}
     </form>
   );
 }

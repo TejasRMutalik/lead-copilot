@@ -80,3 +80,11 @@ export type BriefingRecord = {
   content: unknown;
   created_at: string;
 };
+
+// A possible existing lead for a new enquiry. `reason` is shown in the duplicate dialog.
+export type DuplicateCandidate = {
+  lead: Lead;
+  matchType: "phone" | "email" | "ai";
+  confidence: number;
+  reason: string;
+};

@@ -63,3 +63,8 @@ export function isUuid(value: string): boolean {
 export function describeIssues(error: z.ZodError): string {
   return error.issues.map((issue) => `${issue.path.join(".") || "body"}: ${issue.message}`).join("; ");
 }
+
+// Body of POST /api/leads/[id]/merge: the incoming enquiry and where it came from.
+export const MergeLeadSchema = LeadInputSchema.extend({
+  source: z.enum(["form", "paste"]).default("form"),
+});

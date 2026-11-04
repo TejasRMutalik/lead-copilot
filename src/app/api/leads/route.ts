@@ -1,8 +1,9 @@
-// GET /api/leads lists leads (filters: tier, status, q). POST saves a new lead, then analyzes it.
+// GET /api/leads lists leads (filters: tier, status, q). POST checks for duplicates, then saves a new lead and analyzes it.
 
 import { revalidatePath } from "next/cache";
 import { AiError } from "@/lib/ai/client";
 import { errorResponse, fail, ok } from "@/lib/api";
+import { findDuplicates } from "@/lib/find-duplicates";
 import { addEvent } from "@/lib/repo/events";
 import { createLead, listLeads } from "@/lib/repo/leads";
 import { runAnalysis } from "@/lib/run-analysis";
@@ -40,7 +41,11 @@ export async function POST(request: Request) {
   const source = input.source;
 
   try {
-    // Phase 7: duplicate check goes here, before the insert.
+    // Possible duplicates are returned without saving; the client asks the user what to do.
+    if (!input.skipDuplicateCheck) {
+      const duplicateCandidates = await findDuplicates(input);
+      if (duplicateCandidates.length > 0) return ok({ duplicateCandidates });
+    }
 
     const lead = await createLead(input, source);
     await addEvent(lead.id, "created", { source });
