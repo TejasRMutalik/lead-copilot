@@ -12,7 +12,9 @@
     "lint": "eslint",
     "db:migrate": "tsx --env-file=.env.local db/migrate.ts",
     "ai:try": "tsx --env-file=.env.local scripts/try-analyze.ts",
-    "dup:check": "tsx scripts/check-duplicates.ts"
+    "dup:check": "tsx scripts/check-duplicates.ts",
+    "seed:gen": "tsx --env-file=.env.local scripts/gen-seed-analyses.ts",
+    "db:seed": "tsx --env-file=.env.local db/seed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

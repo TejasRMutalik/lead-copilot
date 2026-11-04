@@ -9,6 +9,7 @@ export type ErrorCode =
   | "AI_RATE_LIMIT"
   | "AI_BAD_OUTPUT"
   | "AI_UNAVAILABLE"
+  | "DEMO_DISABLED"
   | "DB_ERROR";
 
 // `warning` is optional: e.g. the lead was saved but the AI analysis failed.

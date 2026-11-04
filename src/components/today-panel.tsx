@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { TierBadge } from "@/components/tier-badge";
+import { RESET_EVENT } from "@/components/reset-demo-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -71,6 +72,10 @@ export function TodayPanel() {
 
   useEffect(() => {
     void fetchBriefing(false).then(show);
+    // After "Reset demo" the old plan is gone, so load the new one.
+    const onReset = () => void fetchBriefing(false).then(show);
+    window.addEventListener(RESET_EVENT, onReset);
+    return () => window.removeEventListener(RESET_EVENT, onReset);
   }, []);
 
   async function load(refresh: boolean) {
